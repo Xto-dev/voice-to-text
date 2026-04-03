@@ -1,12 +1,89 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
+}
+
+// User model linked with Clerk
+model User {
+  id                String        @id // Clerk user ID
+  email             String        @unique
+  name              String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Subscription relation
+  subscription      Subscription?
+  
+  // Recordings
+  recordings        Recording[]
+  
+  // Messages in chat
+  messages          Message[]
+}
+
+// Subscription model for Stripe
+model Subscription {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Stripe data
+  stripeCustomerId  String        @unique
+  stripeSubId       String?       @unique // subscription ID
+  
+  // Status: free, trial, active, past_due, canceled
+  status            String        @default("free")
+  
+  // Pricing
+  priceId           String?
+  currentPeriodEnd  DateTime?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+// Recording model
+model Recording {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Audio storage (Supabase bucket path or signed URL)
+  audioUrl          String
+  
+  // Transcription result
+  transcription     String
+  
+  // Chat messages related to this recording
+  messages          Message[]
+  
+  createdAt         DateTime      @default(now())
+  
+  @@index([userId])
+}
+
+// Message model for chat history
+model Message {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Can be linked to a recording or standalone
+  recordingId       String?
+  recording         Recording?    @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  
+  // Message content and role
+  role              String        // "user" or "assistant"
+  content           String
+  
+  createdAt         DateTime      @default(now())
+  
+  @@index([userId])
+  @@index([recordingId])
 }
